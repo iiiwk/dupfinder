@@ -1,7 +1,12 @@
 # Build outputs
 build/
+cmake-build/
 install/
 install_debug/
+
+# PyInstaller outputs
+dist/
+*.spec
 
 # Python virtual environment
 venv/

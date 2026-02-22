@@ -127,6 +127,27 @@ macOS (Homebrew Python 3.12+) enforces [PEP 668](https://peps.python.org/pep-066
 
 ---
 
+## Packaging for Release
+
+To create a standalone distributable package (no Python installation required on the target machine):
+
+```bash
+# macOS
+./package_release.sh
+
+# Windows
+package_release.bat
+```
+
+The script uses [PyInstaller](https://pyinstaller.org/) to bundle the Python GUI with all dependencies into a standalone application. Output:
+
+- **macOS**: `dist/dupfinder-macos-arm64.zip` containing `dupfinder.app`
+- **Windows**: `dist/dupfinder-windows-x64/` containing `dupfinder.exe` + `dupfinder_engine.exe`
+
+Users can download and run these packages directly without installing Python, CMake, or any dependencies.
+
+---
+
 ## Project Structure
 
 ```
@@ -137,6 +158,8 @@ macOS (Homebrew Python 3.12+) enforces [PEP 668](https://peps.python.org/pep-066
 ├── CMakeLists.txt            # CMake build configuration
 ├── build_and_install.bat     # One-click build script (Windows)
 ├── build_and_install.sh      # One-click build script (macOS)
+├── package_release.sh        # Release packaging script (macOS)
+├── package_release.bat       # Release packaging script (Windows)
 ├── requirements.txt          # Python dependencies
 └── thirdparty/xxhash/        # xxHash source (bundled)
 ```

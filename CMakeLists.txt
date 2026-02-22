@@ -29,15 +29,15 @@ find_package(OpenMP REQUIRED)
 add_library(xxhash STATIC thirdparty/xxhash/xxhash.c)
 target_include_directories(xxhash PUBLIC thirdparty/xxhash)
 
-add_executable(dupfinder src/dupfinder_main.cpp)
-target_link_libraries(dupfinder PRIVATE xxhash OpenMP::OpenMP_CXX)
+add_executable(dupfinder_engine src/dupfinder_main.cpp)
+target_link_libraries(dupfinder_engine PRIVATE xxhash OpenMP::OpenMP_CXX)
 
 if(WIN32)
-    target_compile_definitions(dupfinder PRIVATE _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
+    target_compile_definitions(dupfinder_engine PRIVATE _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
 endif()
 
 # -- Install rules --
-install(TARGETS dupfinder RUNTIME DESTINATION .)
+install(TARGETS dupfinder_engine RUNTIME DESTINATION .)
 install(FILES
     dupfinder_ui.py
     dupfinder_strings.json

@@ -166,13 +166,24 @@ int main(int argc, char* argv[]) {
     size_t total_files = 0;
     size_t skipped     = 0;
 
-    for (auto& entry : fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied)) {
-        if (!entry.is_regular_file()) continue;
+    for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
+         it != fs::recursive_directory_iterator(); ++it) {
+#ifdef __APPLE__
+        if (it->is_directory()) {
+            auto ext = it->path().extension().string();
+            if (ext == ".app" || ext == ".framework" || ext == ".bundle"
+                || ext == ".kext" || ext == ".plugin" || ext == ".appex") {
+                it.disable_recursion_pending();
+                continue;
+            }
+        }
+#endif
+        if (!it->is_regular_file()) continue;
         std::error_code ec;
-        auto sz = entry.file_size(ec);
+        auto sz = it->file_size(ec);
         if (ec) { ++skipped; continue; }
         if (sz == 0) continue;
-        size_groups[sz].push_back({entry.path(), sz});
+        size_groups[sz].push_back({it->path(), sz});
         ++total_files;
     }
 

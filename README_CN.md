@@ -125,6 +125,27 @@ macOS 上 Homebrew 安装的 Python 3.12+ 遵循 [PEP 668](https://peps.python.o
 
 ---
 
+## 打包发布
+
+如需创建独立分发包（目标机器无需安装 Python）：
+
+```bash
+# macOS
+./package_release.sh
+
+# Windows
+package_release.bat
+```
+
+脚本使用 [PyInstaller](https://pyinstaller.org/) 将 Python GUI 及所有依赖打包为独立应用。产出：
+
+- **macOS**：`dist/dupfinder-macos-arm64.zip`，内含 `dupfinder.app`
+- **Windows**：`dist/dupfinder-windows-x64/`，内含 `dupfinder.exe` + `dupfinder_engine.exe`
+
+用户下载后即可直接运行，无需安装 Python、CMake 或任何依赖。
+
+---
+
 ## 项目结构
 
 ```
@@ -135,6 +156,8 @@ macOS 上 Homebrew 安装的 Python 3.12+ 遵循 [PEP 668](https://peps.python.o
 ├── CMakeLists.txt            # CMake 构建配置
 ├── build_and_install.bat     # 一键构建脚本 (Windows)
 ├── build_and_install.sh      # 一键构建脚本 (macOS)
+├── package_release.sh        # 发布打包脚本 (macOS)
+├── package_release.bat       # 发布打包脚本 (Windows)
 ├── requirements.txt          # Python 依赖
 └── thirdparty/xxhash/        # xxHash 源码（已包含）
 ```

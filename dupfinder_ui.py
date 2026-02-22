@@ -16,21 +16,32 @@ from ttkthemes import ThemedStyle
 
 IS_MAC = sys.platform == "darwin"
 IS_WIN = sys.platform == "win32"
+FROZEN = getattr(sys, "frozen", False)
 
-SCRIPT_DIR = Path(__file__).parent.resolve()
+if FROZEN:
+    BUNDLE_DIR = Path(sys._MEIPASS)
+    APP_DIR = Path(sys.executable).parent
+    if IS_MAC:
+        USER_DIR = Path(sys.executable).resolve().parents[3]
+    else:
+        USER_DIR = APP_DIR
+else:
+    BUNDLE_DIR = Path(__file__).parent.resolve()
+    APP_DIR = BUNDLE_DIR
+    USER_DIR = APP_DIR
 
 if IS_WIN:
-    DUPFINDER_EXE = SCRIPT_DIR / "dupfinder.exe"
-    if not DUPFINDER_EXE.exists():
-        DUPFINDER_EXE = SCRIPT_DIR / "build" / "Release" / "dupfinder.exe"
+    DUPFINDER_EXE = APP_DIR / "dupfinder_engine.exe"
+    if not FROZEN and not DUPFINDER_EXE.exists():
+        DUPFINDER_EXE = APP_DIR / "build" / "Release" / "dupfinder_engine.exe"
 else:
-    DUPFINDER_EXE = SCRIPT_DIR / "dupfinder"
-    if not DUPFINDER_EXE.exists():
-        DUPFINDER_EXE = SCRIPT_DIR / "build" / "dupfinder"
+    DUPFINDER_EXE = APP_DIR / "dupfinder_engine"
+    if not FROZEN and not DUPFINDER_EXE.exists():
+        DUPFINDER_EXE = APP_DIR / "build" / "dupfinder_engine"
 
-FONT_FILE = SCRIPT_DIR / "font" / "HarmonyOS_SansSC_Regular.ttf"
+FONT_FILE = BUNDLE_DIR / "font" / "HarmonyOS_SansSC_Regular.ttf"
 FONT_FAMILY = "HarmonyOS Sans SC"
-CONFIG_FILE = SCRIPT_DIR / "dupfinder_config.json"
+CONFIG_FILE = APP_DIR / "dupfinder_config.json"
 DEFAULT_THEME = "aquativo" if IS_MAC else "xpnative"
 DEFAULT_LANG = "zh"
 
@@ -38,7 +49,7 @@ DEFAULT_LANG = "zh"
 # i18n -- loaded from external JSON
 # ============================================================
 
-STRINGS_FILE = SCRIPT_DIR / "dupfinder_strings.json"
+STRINGS_FILE = BUNDLE_DIR / "dupfinder_strings.json"
 
 def _load_strings() -> dict:
     raw = json.loads(STRINGS_FILE.read_text(encoding="utf-8"))
@@ -364,7 +375,7 @@ class DupFinderGUI:
                                        font=(self.F, 10))
         self.w["scan_dir"].pack(side=tk.LEFT)
 
-        self.dir_var = tk.StringVar(value=str(SCRIPT_DIR))
+        self.dir_var = tk.StringVar(value=str(USER_DIR))
         ttk.Entry(bar, textvariable=self.dir_var, width=55,
                   font=(self.FM, 10)).pack(side=tk.LEFT, padx=(10, 6),
                                            fill=tk.X, expand=True)
@@ -691,8 +702,12 @@ class DupFinderGUI:
 
         def worker():
             try:
+                kwargs = {}
+                if IS_WIN:
+                    kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
                 result = subprocess.run(
-                    [str(exe), target, sort_arg], capture_output=True, timeout=600)
+                    [str(exe), target, sort_arg], capture_output=True, timeout=600,
+                    **kwargs)
                 text = result.stdout.decode("utf-8", errors="replace")
                 self.root.after(0, lambda: self._on_scan_done(text, target))
             except Exception as e:
