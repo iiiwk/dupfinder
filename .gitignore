@@ -1,0 +1,24 @@
+# Build outputs
+build/
+install/
+install_debug/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# User config (generated at runtime)
+dupfinder_config.json
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
