@@ -6,20 +6,32 @@ import threading
 from pathlib import Path
 from dataclasses import dataclass, field
 
+import sys
+import os
 import ctypes
 import json
 import sv_ttk
 from send2trash import send2trash
 from ttkthemes import ThemedStyle
 
+IS_MAC = sys.platform == "darwin"
+IS_WIN = sys.platform == "win32"
+
 SCRIPT_DIR = Path(__file__).parent.resolve()
-DUPFINDER_EXE = SCRIPT_DIR / "dupfinder.exe"
-if not DUPFINDER_EXE.exists():
-    DUPFINDER_EXE = SCRIPT_DIR / "build" / "Release" / "dupfinder.exe"
+
+if IS_WIN:
+    DUPFINDER_EXE = SCRIPT_DIR / "dupfinder.exe"
+    if not DUPFINDER_EXE.exists():
+        DUPFINDER_EXE = SCRIPT_DIR / "build" / "Release" / "dupfinder.exe"
+else:
+    DUPFINDER_EXE = SCRIPT_DIR / "dupfinder"
+    if not DUPFINDER_EXE.exists():
+        DUPFINDER_EXE = SCRIPT_DIR / "build" / "dupfinder"
+
 FONT_FILE = SCRIPT_DIR / "font" / "HarmonyOS_SansSC_Regular.ttf"
 FONT_FAMILY = "HarmonyOS Sans SC"
 CONFIG_FILE = SCRIPT_DIR / "dupfinder_config.json"
-DEFAULT_THEME = "xpnative"
+DEFAULT_THEME = "aquativo" if IS_MAC else "xpnative"
 DEFAULT_LANG = "zh"
 
 # ============================================================
@@ -66,10 +78,45 @@ def _save_config(cfg: dict):
 
 
 def _load_custom_font():
-    if FONT_FILE.exists():
+    if not FONT_FILE.exists():
+        return False
+    if IS_WIN:
         FR_PRIVATE = 0x10
         added = ctypes.windll.gdi32.AddFontResourceExW(str(FONT_FILE), FR_PRIVATE, 0)
         return added > 0
+    if IS_MAC:
+        try:
+            from ctypes import c_void_p, c_int32, c_uint32, c_bool, c_char_p
+            ct = ctypes.cdll.LoadLibrary(
+                "/System/Library/Frameworks/CoreText.framework/CoreText")
+            cf = ctypes.cdll.LoadLibrary(
+                "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+
+            cf.CFStringCreateWithCString.restype = c_void_p
+            cf.CFStringCreateWithCString.argtypes = [c_void_p, c_char_p, c_uint32]
+            cf.CFURLCreateWithFileSystemPath.restype = c_void_p
+            cf.CFURLCreateWithFileSystemPath.argtypes = [c_void_p, c_void_p, c_int32, c_bool]
+            cf.CFRelease.argtypes = [c_void_p]
+            ct.CTFontManagerRegisterFontsForURL.restype = c_bool
+            ct.CTFontManagerRegisterFontsForURL.argtypes = [c_void_p, c_uint32, c_void_p]
+
+            kCFStringEncodingUTF8 = 0x08000100
+            kCTFontManagerScopeProcess = 1
+
+            cf_str = cf.CFStringCreateWithCString(
+                None, str(FONT_FILE).encode("utf-8"), kCFStringEncodingUTF8)
+            if not cf_str:
+                return False
+            cf_url = cf.CFURLCreateWithFileSystemPath(None, cf_str, 0, False)
+            cf.CFRelease(cf_str)
+            if not cf_url:
+                return False
+            ok = ct.CTFontManagerRegisterFontsForURL(
+                cf_url, kCTFontManagerScopeProcess, None)
+            cf.CFRelease(cf_url)
+            return bool(ok)
+        except Exception:
+            return False
     return False
 
 
@@ -197,8 +244,15 @@ class DupFinderGUI:
         self.root.minsize(850, 520)
 
         self.has_custom_font = _load_custom_font()
-        self.F = FONT_FAMILY if self.has_custom_font else "Segoe UI"
-        self.FM = FONT_FAMILY if self.has_custom_font else "Consolas"
+        if self.has_custom_font:
+            self.F = FONT_FAMILY
+            self.FM = FONT_FAMILY
+        elif IS_MAC:
+            self.F = "PingFang SC"
+            self.FM = "Menlo"
+        else:
+            self.F = "Segoe UI"
+            self.FM = "Consolas"
 
         self.config = _load_config()
         saved_theme = self.config.get("theme", DEFAULT_THEME)
@@ -390,8 +444,15 @@ class DupFinderGUI:
                                 activeforeground="#ffffff")
         self.ctx_menu.add_command(label=self.t("ctx_delete"), command=self._delete_selected)
         self.ctx_menu.add_command(label=self.t("ctx_open_folder"), command=self._open_folder)
-        self.tree.bind("<Button-3>", self._show_context_menu)
+        if IS_MAC:
+            self.tree.bind("<Button-2>", self._show_context_menu)
+            self.tree.bind("<Button-3>", self._show_context_menu)
+            self.tree.bind("<Control-Button-1>", self._show_context_menu)
+        else:
+            self.tree.bind("<Button-3>", self._show_context_menu)
         self.tree.bind("<Delete>", lambda e: self._delete_selected())
+        if IS_MAC:
+            self.tree.bind("<BackSpace>", lambda e: self._delete_selected())
 
     # -- Action bar --
 
@@ -403,13 +464,24 @@ class DupFinderGUI:
         bar = tk.Frame(outer, bg=C["surface_dim"], padx=12, pady=8)
         bar.pack(fill=tk.X)
 
-        self.w["del_btn"] = tk.Button(
-            bar, text=self.t("btn_delete"), font=(self.F, 10, "bold"),
-            bg=C["danger"], fg="#ffffff",
-            activebackground=C["danger_hover"], activeforeground="#ffffff",
-            relief="flat", padx=16, pady=4, cursor="hand2",
-            command=self._delete_selected)
-        self.w["del_btn"].pack(side=tk.LEFT)
+        if IS_MAC:
+            del_btn = tk.Label(
+                bar, text=self.t("btn_delete"), font=(self.F, 10, "bold"),
+                bg=C["danger"], fg="#ffffff",
+                padx=16, pady=4, cursor="hand2")
+            del_btn.pack(side=tk.LEFT)
+            del_btn.bind("<Button-1>", lambda e: self._delete_selected())
+            del_btn.bind("<Enter>", lambda e: del_btn.configure(bg=C["danger_hover"]))
+            del_btn.bind("<Leave>", lambda e: del_btn.configure(bg=C["danger"]))
+        else:
+            del_btn = tk.Button(
+                bar, text=self.t("btn_delete"), font=(self.F, 10, "bold"),
+                bg=C["danger"], fg="#ffffff",
+                activebackground=C["danger_hover"], activeforeground="#ffffff",
+                relief="flat", padx=16, pady=4, cursor="hand2",
+                command=self._delete_selected)
+            del_btn.pack(side=tk.LEFT)
+        self.w["del_btn"] = del_btn
 
         self.skip_confirm = tk.BooleanVar(value=False)
         self.w["chk_skip"] = ttk.Checkbutton(bar, text=self.t("skip_confirm"),
@@ -431,7 +503,10 @@ class DupFinderGUI:
         self.sel_label.pack(side=tk.RIGHT)
 
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
-        self.tree.bind("<Control-a>", self._select_all_files)
+        if IS_MAC:
+            self.tree.bind("<Command-a>", self._select_all_files)
+        else:
+            self.tree.bind("<Control-a>", self._select_all_files)
 
     # -- Status bar --
 
@@ -576,7 +651,12 @@ class DupFinderGUI:
                 gi, rel = self.item_map[iid]
                 folder = (Path(self.scan_root) / rel).parent
                 if folder.exists():
-                    import os; os.startfile(str(folder))
+                    if IS_MAC:
+                        subprocess.run(["open", str(folder)])
+                    elif IS_WIN:
+                        os.startfile(str(folder))
+                    else:
+                        subprocess.run(["xdg-open", str(folder)])
                 break
 
     # -- Scan --
@@ -595,9 +675,10 @@ class DupFinderGUI:
 
         exe = DUPFINDER_EXE
         if not exe.exists():
+            ftypes = [("Executable", "*.exe")] if IS_WIN else [("All Files", "*")]
             alt = filedialog.askopenfilename(
                 title=self.t("err_exe_title"),
-                filetypes=[("Executable", "*.exe")])
+                filetypes=ftypes)
             if not alt:
                 return
             exe = Path(alt)
